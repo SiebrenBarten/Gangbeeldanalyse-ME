@@ -79,10 +79,6 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
         str_split = data.split('_')
         side = None
         if str_split[1] == "comf":
-            if representative_name == "anne":
-                sheet_add = "0.25L"
-                side = "L"
-            else:
                 sheet_add = str_split[1]
                 side = "L"
                 # side remains None; will fall back to default_leg if provided
@@ -94,6 +90,7 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
 
         # decide leg to use for reading
         leg_use = default_leg if default_leg is not None else side if side is not None else "L"
+    
         return sheet_add, side, leg_use
 
     if not cohort:
@@ -104,8 +101,26 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
             for data in data_sheets:
                 # parse sheet and decide leg without mutating the caller arg
                 sheet_add, side, leg_use = determine_sheet_add(data, name, leg)
+                
+                # print(f"Sheet add: {sheet_add}")
+                
+                # determine prefix letter: 'L' for 'comf' or the trailing L/R of sheet_add
+                if sheet_add.lower() == 'comf':
+                    prefix = 'L'
+                else:
+                    prefix = sheet_add[-1].upper() if len(sheet_add) > 0 and sheet_add[-1].isalpha() else 'L'
 
-                gait, mean, std = leg_movement_data(file_path=name + data, sheet_name=motion + ' ' + sheet_add, leg=leg_use)
+                # apply prefix to the second word of motion (prepend letter). If no second word, append it.
+                parts = motion.split()
+                if len(parts) >= 2:
+                    parts[1] = prefix + parts[1]
+                else:
+                    parts.append(prefix)
+                motion_with_prefix = ' '.join(parts)
+
+                # print(f"Using sheet_name='{motion_with_prefix} {sheet_add}'")
+
+                gait, mean, std = leg_movement_data(file_path=name + data, sheet_name=motion_with_prefix + ' ' + sheet_add, leg=leg_use)
 
                 # Alles naar numerieke numpy-arrays
                 gait = np.asarray(gait, dtype=float)
@@ -116,7 +131,7 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
                 mask = np.isfinite(gait) & np.isfinite(mean) & np.isfinite(std)
 
                 # Plot mean
-                plt.plot(gait[mask], mean[mask], label=f'Mean {motion} {sheet_add}')
+                plt.plot(gait[mask], mean[mask], label=f'Mean {motion_with_prefix} {sheet_add}')
 
                 # Std-band (optioneel)
                 if plot_std is True:
@@ -166,17 +181,33 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
             # determine sheet_add based on representative name (handles comf special-case)
             sheet_add, side, leg_use_default = determine_sheet_add(data, representative_name, leg)
 
+            # determine prefix letter: 'L' for 'comf' or the trailing L/R of sheet_add
+            if sheet_add.lower() == 'comf':
+                prefix = 'L'
+            else:
+                prefix = sheet_add[-1].upper() if len(sheet_add) > 0 and sheet_add[-1].isalpha() else 'L'
+
+            # apply prefix to the second word of motion (prepend letter). If no second word, append it.
+            parts = motion.split()
+            if len(parts) >= 2:
+                parts[1] = prefix + parts[1]
+            else:
+                parts.append(prefix)
+            motion_with_prefix = ' '.join(parts)
+
+            # print(f"Using sheet_name='{motion_with_prefix} {sheet_add}'")
+
             # collect arrays for each subject
             gait_list = []
             mean_list = []
             std_list = []
             for name in names:
-                _, mean_sub, std_sub = leg_movement_data(file_path=name + data, sheet_name=motion + ' ' + sheet_add, leg=leg_use_default)
+                _, mean_sub, std_sub = leg_movement_data(file_path=name + data, sheet_name=motion_with_prefix + ' ' + sheet_add, leg=leg_use_default)
                 # convert to numeric arrays (keep NaNs)
                 mean_arr = np.asarray(mean_sub, dtype=float)
                 std_arr = np.asarray(std_sub, dtype=float)
                 # gait: try to get a consistent gait axis; prefer the first finite one
-                gait_sub, _, _ = leg_movement_data(file_path=name + data, sheet_name=motion + ' ' + sheet_add, leg=leg_use_default)
+                gait_sub, _, _ = leg_movement_data(file_path=name + data, sheet_name=motion_with_prefix + ' ' + sheet_add, leg=leg_use_default)
                 gait_arr = np.asarray(gait_sub, dtype=float)
                 gait_list.append(gait_arr)
                 mean_list.append(mean_arr)
@@ -205,13 +236,13 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
             # Mask for plotting
             mask = np.isfinite(gait_axis) & np.isfinite(mean_agg)
 
-            plt.plot(gait_axis[mask], mean_agg[mask], label=f'Cohort mean {motion} {sheet_add}')
+            plt.plot(gait_axis[mask], mean_agg[mask], label=f'Cohort mean {motion_with_prefix} {sheet_add}')
             if plot_std:
                 lower = (mean_agg - std_agg)[mask]
                 upper = (mean_agg + std_agg)[mask]
                 plt.fill_between(gait_axis[mask], lower, upper, alpha=0.2)
 
-            print(f"{sheet_add}: cohort mean std {np.nanmean(std_agg):.4f}")
+            # print(f"{sheet_add}: cohort mean std {np.nanmean(std_agg):.4f}")
 
         # --- Classic gait event markers (percent of gait cycle) ---
         gait_events = {
