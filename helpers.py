@@ -1,8 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-import re
 
 def leg_movement_data(file_path, sheet_name=None, leg=None):
     # Aim: always return three numeric arrays of length 100 (gait_phase, mean, std).
@@ -76,7 +74,6 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
     If cohort is False (default), behave as before: one figure per name.
     If cohort is True, produce a single figure with the averaged mean/std across all names.
     """
-
     # helper to parse sheet_add and side using a representative name (for comf special-case)
     def determine_sheet_add(data, representative_name, default_leg):
         str_split = data.split('_')
@@ -96,17 +93,6 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
     
         return sheet_add, side, leg_use
 
-    # helper to extract a patient id from a filename/path (fallback: basename)
-    def extract_patient_id(path):
-        base = os.path.basename(path)
-        matches = re.findall(r'(\d+)', base)
-        if matches:
-            return matches[-1]
-        return base
-
-    # Prepare patient id mapping (use these in plots instead of the literal filename)
-    patient_ids = {n: extract_patient_id(n) for n in names}
-
     # Prepare anonymized mapping if requested (only applies to non-cohort mode)
     anon_map = {}
     if anonimity and not cohort:
@@ -116,13 +102,14 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
     if not cohort:
         # Original behavior: a figure per name
         for name in names:
-            # Use anonymized label if requested, otherwise the extracted patient id
-            display_name = anon_map.get(name, patient_ids.get(name, os.path.basename(name)))
+            display_name = anon_map.get(name, name)
             print(f"===== {motion} variability {display_name} =====")
             plt.figure(figsize=(10, 6))
             for data in data_sheets:
                 # parse sheet and decide leg without mutating the caller arg
                 sheet_add, side, leg_use = determine_sheet_add(data, name, leg)
+                
+                # print(f"Sheet add: {sheet_add}")
                 
                 # determine prefix letter: 'L' for 'comf' or the trailing L/R of sheet_add
                 if sheet_add.lower() == 'comf':
@@ -137,6 +124,8 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
                 else:
                     parts.append(prefix)
                 motion_with_prefix = ' '.join(parts)
+
+                # print(f"Using sheet_name='{motion_with_prefix} {sheet_add}'")
 
                 gait, mean, std = leg_movement_data(file_path=name + data, sheet_name=motion_with_prefix + ' ' + sheet_add, leg=leg_use)
 
@@ -212,6 +201,8 @@ def plot_gait_motion(names, data_sheets, motion, leg=None, plot_std=True, cohort
             else:
                 parts.append(prefix)
             motion_with_prefix = ' '.join(parts)
+
+            # print(f"Using sheet_name='{motion_with_prefix} {sheet_add}'")
 
             # collect arrays for each subject
             gait_list = []
